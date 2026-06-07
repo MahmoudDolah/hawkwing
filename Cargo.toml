@@ -1,0 +1,29 @@
+[package]
+name = "hawkwing"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "hawkwing"
+path = "src/main.rs"
+
+[lib]
+name = "hawkwing"
+path = "src/lib.rs"
+
+[features]
+audio = ["dep:rodio"]
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+dirs = "5"
+lofty = "0"
+rodio = { version = "0", features = ["symphonia-all"], optional = true }
+rusqlite = { version = "0", features = ["bundled"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"
