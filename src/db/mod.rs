@@ -134,6 +134,27 @@ impl Database {
         rows.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
     }
 
+    pub fn get_track_by_id(&self, id: i64) -> Result<Option<TrackRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, title, artist, album, duration_ms, filepath
+             FROM track WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query(rusqlite::params![id])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(TrackRow {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                artist: row.get(2)?,
+                album: row.get(3)?,
+                duration_ms: row.get(4)?,
+                filepath: row.get(5)?,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn track_count(&self) -> Result<usize> {
         let n: i64 = self
             .conn
@@ -181,5 +202,21 @@ mod tests {
         let results = db.search_tracks("Numb").unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].title, "Comfortably Numb");
+    }
+
+    #[test]
+    fn get_track_by_id_returns_correct_row() {
+        let db = Database::open_in_memory().unwrap();
+        db.upsert_track("Heroes", "David Bowie", "Heroes", 369000, "/heroes.flac").unwrap();
+        let row = db.find_track("David Bowie", "Heroes").unwrap().unwrap();
+        let found = db.get_track_by_id(row.id).unwrap().unwrap();
+        assert_eq!(found.title, "Heroes");
+        assert_eq!(found.id, row.id);
+    }
+
+    #[test]
+    fn get_track_by_id_miss_returns_none() {
+        let db = Database::open_in_memory().unwrap();
+        assert!(db.get_track_by_id(9999).unwrap().is_none());
     }
 }

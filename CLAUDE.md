@@ -38,11 +38,27 @@ pub trait Resolver: Send + Sync {
 ```
 `Orchestrator` fans out to all resolvers, merges, and sorts descending by `score: f32`.
 
+### Resolver protocol (Phase 2)
+Resolver executables are spawned as subprocesses (`ResolverProcess`), print `{"port": N}`
+on their first stdout line, and expose an HTTP API: `GET /info`, `POST /resolve`,
+`GET /track/<id>`. `HttpResolver` wraps either a spawned process or a peer URL.
+`load_resolvers(dir)` scans a directory for executables and connects to each.
+
+### P2P (Phase 3)
+`--p2p` starts a `Node`: a `PeerServer` (tiny_http, serves `/info`, `/resolve`,
+`/track/<id>` with Range support) plus mDNS announce/browse (`mdns-sd`,
+service type `_hawkwing._tcp.local.`). Discovered peers connect via
+`HttpResolver::connect_peer`, which is just an `HttpResolver` pointed at the
+peer's base URL — no separate peer-resolver type was needed. Peer servers don't
+know their own external address, so they return relative URLs (`/track/<id>`);
+`HttpResolver::resolve` detects the leading `/` and prepends `base_url`.
+A UUID v4 node ID is persisted at `~/.local/share/hawkwing/node_id` (`node_id::get_or_create`).
+
 ## Project Phases
 
 - **Phase 1** (complete): scan library, search, play local files from CLI
-- **Phase 2**: HTTP REST resolver protocol + subprocess-isolated resolvers
-- **Phase 3**: P2P discovery via mDNS + direct TCP
+- **Phase 2** (complete): HTTP REST resolver protocol + subprocess-isolated resolvers
+- **Phase 3** (complete): P2P discovery via mDNS + direct TCP
 - **Phase 4**: Qt6/QML UI
 
 ## Reference Codebase

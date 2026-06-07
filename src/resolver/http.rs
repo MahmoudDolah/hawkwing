@@ -101,6 +101,24 @@ impl HttpResolver {
         let process = ResolverProcess::spawn(path)?;
         Self::connect(process)
     }
+
+    /// Connect to a peer's HTTP server by URL (no subprocess).
+    pub fn connect_peer(base_url: String) -> Result<Self> {
+        let agent = ureq::AgentBuilder::new().timeout(REQUEST_TIMEOUT).build();
+        let info: InfoResponse = agent
+            .get(&format!("{base_url}/info"))
+            .call()
+            .context("GET /info from peer")?
+            .into_json()
+            .context("parse /info response")?;
+        Ok(HttpResolver {
+            _process: None,
+            name: info.name,
+            weight: info.weight,
+            base_url,
+            agent,
+        })
+    }
 }
 
 impl Resolver for HttpResolver {
@@ -131,16 +149,24 @@ impl Resolver for HttpResolver {
             .results
             .into_iter()
             .filter(|r| !r.artist.is_empty() && !r.title.is_empty() && !r.url.is_empty())
-            .map(|r| ResolveResult {
+            .map(|r| {
+                // Peer servers return relative URLs like /track/<id>; prepend base_url.
+                let url = if r.url.starts_with('/') {
+                    format!("{}{}", self.base_url, r.url)
+                } else {
+                    r.url
+                };
+                ResolveResult {
                 artist: r.artist,
                 title: r.title,
                 album: r.album,
                 duration_ms: r.duration_ms,
                 source: Source::Url {
-                    url: r.url,
+                    url,
                     mimetype: r.mimetype,
                 },
                 score: r.score,
+            }
             })
             .collect();
 
@@ -228,5 +254,40 @@ mod tests {
         );
         let results = resolver.resolve(&Query::new("x", "y")).unwrap();
         assert!(results.is_empty());
+    }
+
+    #[test]
+    fn relative_url_is_expanded_with_base_url() {
+        let body = r#"{"results":[{
+            "artist":"A","title":"T","album":"",
+            "url":"/track/42","duration_ms":1000,"score":1.0
+        }]}"#;
+        let port = mock_server(vec![("/resolve", body)]);
+        let base = format!("http://127.0.0.1:{port}");
+        let resolver = HttpResolver::connect_url(base.clone(), "Peer".into(), 80);
+        let results = resolver.resolve(&Query::new("A", "T")).unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(
+            matches!(&results[0].source, Source::Url { url, .. } if *url == format!("{base}/track/42")),
+            "expected base_url prepended to /track/42"
+        );
+    }
+
+    #[test]
+    fn absolute_url_is_left_unchanged() {
+        let body = r#"{"results":[{
+            "artist":"A","title":"T","album":"",
+            "url":"https://cdn.example.com/song.mp3","duration_ms":1000,"score":0.8
+        }]}"#;
+        let port = mock_server(vec![("/resolve", body)]);
+        let resolver = HttpResolver::connect_url(
+            format!("http://127.0.0.1:{port}"),
+            "Peer".into(),
+            80,
+        );
+        let results = resolver.resolve(&Query::new("A", "T")).unwrap();
+        assert!(
+            matches!(&results[0].source, Source::Url { url, .. } if url == "https://cdn.example.com/song.mp3")
+        );
     }
 }

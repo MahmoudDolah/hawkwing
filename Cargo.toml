@@ -19,14 +19,17 @@ anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
 lofty = "0"
+mdns-sd = "0"
 rodio = { version = "0", features = ["symphonia-all"], optional = true }
 rusqlite = { version = "0", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tempfile = "3"
+tiny_http = "0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ureq = { version = "2", features = ["json"] }
+uuid = { version = "1", features = ["v4"] }
 walkdir = "2"
 
 [dev-dependencies]
-tempfile = "3"
