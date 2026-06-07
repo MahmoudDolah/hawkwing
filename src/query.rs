@@ -18,6 +18,7 @@ impl Query {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Source {
     LocalFile(String),
+    Url { url: String, mimetype: String },
 }
 
 /// A resolver's answer for a given Query.
